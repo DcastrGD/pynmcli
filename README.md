@@ -23,7 +23,7 @@ Requisitos
 Clonar el repositorio:
 
 ```bash
-git clone https://github.com/TU-USUARIO/pynmcli.git
+git clone https://github.com/DcastrGD/pynmcli.git
 cd pynmcli
 ```
 
