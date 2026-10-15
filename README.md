@@ -1,53 +1,53 @@
 # pynmcli
 
-Pequeño proyecto en Python para trabajar con nmcli en Linux.
+A Python project for working with nmcli on Linux.
 
-El script comprueba si nmcli está instalado y, si no lo encuentra, intenta instalar NetworkManager utilizando el gestor de paquetes del sistema.
-Características
+The script checks whether nmcli is installed and, if it isn't found, attempts to install NetworkManager using the system's package manager.
+Features
 
-- Detección de la distribución de Linux.
-- Comprobación de la instalación de nmcli.
-- Instalación automática de NetworkManager si es necesario.
-- Mensajes de estado con colores en la terminal.
+- Detection of the Linux distribution.
+- Checking for the installation of nmcli.
+- Automatic installation of NetworkManager if necessary.
+- Color-coded status messages in the terminal.
 
-Requisitos
+Requirements:
 
 - Linux.
 - Python 3.
-- Permisos de administrador para instalar paquetes.
+- Administrator permissions to install packages.
 
 
 
-## Instalación:
+## Installation:
 
-Clonar el repositorio:
+Clone the repository:
 
 ```bash
 git clone https://github.com/DcastrGD/pynmcli.git
 cd pynmcli
 ```
 
-Ejecuta el instalador:
+Run the installer:
 
 ```bash
 chmod +x setup.py
 python setup.py
 ```
 
-Para la instalación a nivel sistema:
+For system-wide installation:
 
 ```bash
 chmod +x install.sh
 ./intall.sh
 ```
 
-También puedes ejecutar directamente el script de Python:
+You can also run the Python script directly:
 
 ```python
 python3 pycli.py
 ```
 
-Estructura del proyecto:
+Project Structure:
 
 ```
 pynmcli/
@@ -58,8 +58,6 @@ pynmcli/
 └── setup.py
 ```
 
-Licencia
+License
 
-Este proyecto utiliza la licencia MIT. Consulta el archivo LICENSE para más información.
-
-Proyecto personal con Python y trabajar con herramientas de Linux.
+This project is licensed under the MIT License. See the LICENSE file for more information.
