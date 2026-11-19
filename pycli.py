@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import subprocess
+import ipaddress
 
 ROJO = "\033[91m"
 VERDE = "\033[92m"
@@ -8,140 +9,295 @@ AMARILLO = "\033[93m"
 AZUL = "\033[94m"
 RESET = "\033[0m"
 
+
 class NMCLI_CONFIGS:
 
     def __init__(self):
-        
-        self.name_conexion = []
+        self.name_conexion = ""
 
+    # Ejecutar comandos de nmcli
+    def ejecutar_comando(self, args):
+        resultado = subprocess.run(
+            ["nmcli"] + args,
+            capture_output=True,
+            text=True
+        )
+
+        if resultado.returncode != 0:
+            print(f"{ROJO}Error: {resultado.stderr.strip()}{RESET}")
+            return False
+
+        if resultado.stdout.strip():
+            print(resultado.stdout.strip())
+
+        return True
+
+    # Limpiar la terminal
+    def limpiar_terminal(self):
+        subprocess.run(["clear"])
+
+    # Mostrar y eliminar conexiones
     def delete_interface(self):
-        show_interface = subprocess.run(["nmcli con show"], shell=True, capture_output=True, text=True)
-        print(show_interface.stdout)
+        self.limpiar_terminal()
 
-        print(f"{VERDE}[+]{RESET} Saltar eliminación de la Interfaz (ENTER)")
-        delete_interface = input(f"{AZUL}[*]{RESET} Escribe el nombre de la interfaz a eliminar (NAME): ")
+        print(f"{AZUL}Conexiones disponibles:{RESET}\n")
 
-        delete = subprocess.run([f"nmcli con delete {delete_interface}"], shell=True, capture_output=True, text=True)
-        print(delete.stdout)
+        if not self.ejecutar_comando(["con", "show"]):
+            return
 
-        return delete
+        nombre = input(
+            f"\n{AZUL}[*]{RESET} Nombre de la conexión a eliminar "
+            "(ENTER para saltar): "
+        ).strip()
 
+        if nombre == "":
+            return
+
+        confirmar = input(
+            f"{AMARILLO}¿Quieres eliminar {nombre}? (s/n): {RESET}"
+        ).strip().lower()
+
+        if confirmar == "s":
+            self.ejecutar_comando([
+                "con", "delete", "id", nombre
+            ])
+
+    # Seleccionar una conexión existente
     def show_interface(self):
+        self.limpiar_terminal()
 
-        clear = subprocess.run(["clear"], shell=True, capture_output=True, text=True)
-        print(clear.stdout)
-        
-        delete = subprocess.run(["nmcli con show"], shell=True, capture_output=True, text=True)
-        print(delete.stdout)
+        print(f"{AZUL}Conexiones disponibles:{RESET}\n")
 
-        print(f"{VERDE}[+]{RESET} Para configurar un nuevo perfil de interfaz (ENTER)")
-        name = input(f"{AZUL}[*]{RESET} Seleccione la conexión a modificar (NAME): ")
+        if not self.ejecutar_comando(["con", "show"]):
+            return
 
-        
-        self.name_conexion.append(name)
+        nombre = input(
+            f"\n{AZUL}[*]{RESET} Selecciona una conexión "
+            "(ENTER para crear una nueva): "
+        ).strip()
 
-        return self.name_conexion 
-       
+        if nombre == "":
+            self.name_conexion = ""
+            return
 
+        resultado = subprocess.run(
+            ["nmcli", "-g", "NAME", "con", "show"],
+            capture_output=True,
+            text=True
+        )
+
+        conexiones = resultado.stdout.splitlines()
+
+        if resultado.returncode != 0 or nombre not in conexiones:
+            print(f"{ROJO}La conexión no existe.{RESET}")
+            self.name_conexion = ""
+            return
+
+        self.name_conexion = nombre
+
+    # Crear un perfil nuevo
     def add_profiles(self):
+        print(f"\n{VERDE}Crear un nuevo perfil{RESET}")
 
-        name = None
-        tipo = None
-        ifname = None
-        
-        try:
-            while name is None:
-                entrada = input("Escriba el nombre de la conexión: ")
-                if entrada != "":
-                    name = entrada
+        nombre = input("Nombre de la conexión: ").strip()
 
-            while tipo is None:
-                entrada = input("Tipo de la interfaz (ethernet): ")
-                if entrada != "":
-                    tipo = entrada
+        if not nombre:
+            print(f"{ROJO}El nombre es obligatorio.{RESET}")
+            return
 
-            while ifname is None:
-                entrada = input("Nombre de la interfaz (enp0sX): ")
-                if entrada != "":
-                    ifname = entrada
+        tipo = input(
+            "Tipo de interfaz (ethernet, wifi) [ethernet]: "
+        ).strip().lower()
 
-            add_profiles = subprocess.run(
-                [
-                    "nmcli", "con", "add",
-                    "con-name", name,
-                    "type", tipo,
-                    "ifname", ifname
-                ],
-                capture_output=True,
-                text=True
-            )
+        if tipo == "":
+            tipo = "ethernet"
 
-        except Exception as e:
-            print(f"Error: {e}")
+        ifname = input(
+            "Nombre del dispositivo (ej. enp0s3): "
+        ).strip()
 
+        if ifname == "":
+            print(f"{ROJO}El dispositivo es obligatorio.{RESET}")
+            return
 
+        correcto = self.ejecutar_comando([
+            "con", "add",
+            "con-name", nombre,
+            "type", tipo,
+            "ifname", ifname
+        ])
+
+        if correcto:
+            self.name_conexion = nombre
+            print(f"{VERDE}Perfil creado correctamente.{RESET}")
+
+    # Modificar la configuración IPv4
     def modify_interface(self):
-        
-        ip = str(input("Escriba la ip X.X.X.X/XX: "))
 
-        if ip != "":
-             modify_interface_ip = subprocess.run([f"nmcli con modify {self.name_conexion} ipv4.address {ip}"], shell=True, capture_output=True, text=True)  
+        if not self.name_conexion:
+            print(f"{ROJO}No hay ninguna conexión seleccionada.{RESET}")
+            return
+
+        nombre = self.name_conexion
+
+        print(f"\n{VERDE}Configurando la conexión: {nombre}{RESET}")
+
+        print("\nMétodo IPv4:")
+        print("1. Manual (IP estática)")
+        print("2. Auto (DHCP)")
+        print("3. Mantener el método actual")
+
+        opcion = input("Selecciona una opción: ").strip()
+
+        if opcion == "1":
+            metodo = "manual"
+        elif opcion == "2":
+            metodo = "auto"
+        elif opcion == "3" or opcion == "":
+            metodo = ""
         else:
-             modify_interface_ip = subprocess.run([f"nmcli con modify {self.name_conexion} ipv4.address {ip}"], shell=True, capture_output=True, text=True)
-             print(modify_interface_ip.stdout)
+            print(f"{ROJO}Opción no válida.{RESET}")
+            return
 
-        gateway = str(input("Esciba la puerta de enlace: "))
-        
-        if gateway != "":
-            modify_interface_gateway = subprocess.run([f"nmcli con modify  {self.name_conexion} ipv4.gateway {gateway}"], shell=True, capture_output=True, text=True)
-        else:
-            modify_interface_gateway = subprocess.run([f"nmcli con modify  {self.name_conexion} ipv4.gateway {gateway}"], shell=True, capture_output=True, text=True)
-            print(modify_interface_gateway.stdout)
+        ip = ""
+        gateway = ""
+        dns = ""
 
-    
-        dns = str(input("Escriba el dns: "))
-        
-        if dns != "":
-            modify_interface_dns = subprocess.run([f"nmcli con modify {self.name_conexion} ipv4.dns {dns}"], shell=True, capture_output=True, text=True)
-        else:
-            modify_interface_dns = subprocess.run([f"nmcli con modify {self.name_conexion} ipv4.dns {dns}"], shell=True, capture_output=True, text=True)
-            print(modify_interface_dns.stdout)
+        # Pedir los datos si se va a utilizar IP manual
+        if metodo == "manual":
 
-       
-        method = input("Escriba el método que vas a usar (manual, auto): ")    
-            
-        if method != "":
-            modify_interface_method = subprocess.run([f"nmcli con modify {self.name_conexion} ipv4.method {method}"], shell=True, capture_output=True, text=True)
-        else: 
-             modify_interface_method = subprocess.run([f"nmcli con modify {self.name_conexion} ipv4.method {method}"], shell=True, capture_output=True, text=True)
-             print(modify_interface_method.stdout)
-               
-        
-        modify_interface_down_up = subprocess.run([f"nmcli con modify up {self.name_conexion}"], shell=True, capture_output=True, text=True)
-        print(modify_interface_down_up.stdout)
+            ip = input(
+                "Dirección IP con prefijo (ej. 192.168.1.20/24): "
+            ).strip()
+
+            try:
+                ipaddress.IPv4Interface(ip)
+            except ValueError:
+                print(f"{ROJO}La dirección IP no es válida.{RESET}")
+                return
+
+            gateway = input(
+                "Puerta de enlace (ENTER para omitir): "
+            ).strip()
+
+            if gateway:
+                try:
+                    ipaddress.IPv4Address(gateway)
+                except ValueError:
+                    print(f"{ROJO}La puerta de enlace no es válida.{RESET}")
+                    return
+
+            dns = input(
+                "DNS (ENTER para omitir; varios separados por comas): "
+            ).strip()
+
+            if dns:
+                try:
+                    dns = ",".join(
+                        str(ipaddress.IPv4Address(x.strip()))
+                        for x in dns.split(",")
+                    )
+                except ValueError:
+                    print(f"{ROJO}El DNS no es válido.{RESET}")
+                    return
+
+        # Configurar primero la dirección IP
+        if metodo == "manual":
+
+            if not self.ejecutar_comando([
+                "con", "modify", nombre,
+                "ipv4.addresses", ip
+            ]):
+                return
+
+            # Configurar la puerta de enlace
+            if not self.ejecutar_comando([
+                "con", "modify", nombre,
+                "ipv4.gateway", gateway
+            ]):
+                return
+
+            # Configurar el DNS
+            if not self.ejecutar_comando([
+                "con", "modify", nombre,
+                "ipv4.dns", dns
+            ]):
+                return
+
+        # Si se elige DHCP, eliminar los valores estáticos
+        elif metodo == "auto":
+
+            if not self.ejecutar_comando([
+                "con", "modify", nombre,
+                "ipv4.addresses", ""
+            ]):
+                return
+
+            if not self.ejecutar_comando([
+                "con", "modify", nombre,
+                "ipv4.gateway", ""
+            ]):
+                return
+
+            if not self.ejecutar_comando([
+                "con", "modify", nombre,
+                "ipv4.dns", ""
+            ]):
+                return
+
+        # Configurar el método SIEMPRE al final
+        if metodo:
+            if not self.ejecutar_comando([
+                "con", "modify", nombre,
+                "ipv4.method", metodo
+            ]):
+                return
+
+        print(f"\n{VERDE}Configuración guardada.{RESET}")
+
+        activar = input(
+            "¿Quieres activar la conexión ahora? (s/n): "
+        ).strip().lower()
+
+        if activar == "s":
+            self.ejecutar_comando([
+                "con", "up", "id", nombre
+            ])
 
 
+# Programa principal
+def main():
 
-NMCLI = NMCLI_CONFIGS()
+    nmcli = NMCLI_CONFIGS()
 
-NMCLI.delete_interface()
-    
-NMCLI.show_interface()
+    # Eliminar una conexión o saltar
+    nmcli.delete_interface()
 
-if not NMCLI.name_conexion or NMCLI.name_conexion[0] == "":
+    # Seleccionar una conexión existente
+    nmcli.show_interface()
 
-    clear = subprocess.run(["clear"], shell=True, capture_output=True, text=True)
-    print(clear.stdout)
+    # Si no se ha seleccionado ninguna, crear un perfil
+    if nmcli.name_conexion == "":
 
-    print(f"{AMARILLO}[-]{RESET} No seleccionaste ninguna interfaz existente...")
-    print(f"{VERDE}[+]{RESET} Creación de nuevo perfil de interfaz:\n ")
-    NMCLI.add_profiles()
+        print(
+            f"\n{AMARILLO}No has seleccionado una conexión existente."
+            f"{RESET}"
+        )
 
-    print(f"\n{VERDE}[+]{RESET} Pasando a modificar la nueva conexión:")
-    NMCLI.modify_interface()
-else:
-    clear = subprocess.run(["clear"], shell=True, capture_output=True, text=True)
-    print(clear.stdout)
-    # Si el usuario escribió una interfaz válida (ej. enp0s8)
-    print(f"{VERDE}[+]{RESET} Pasando a modificar la interfaz seleccionada...")
-    NMCLI.modify_interface()
+        crear = input(
+            "¿Quieres crear un perfil nuevo? (s/n): "
+        ).strip().lower()
+
+        if crear != "s":
+            print("Saliendo del programa.")
+            return
+
+        nmcli.add_profiles()
+
+    # Modificar la conexión seleccionada o creada
+    if nmcli.name_conexion:
+        nmcli.modify_interface()
+
+
+if __name__ == "__main__":
+    main()
